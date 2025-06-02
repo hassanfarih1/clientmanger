@@ -13,13 +13,30 @@ const formatCurrency = (amount) => {
   if (amount === null || amount === undefined || isNaN(amount)) {
     return '';
   }
-  // Use 'fr-FR' locale which uses comma for decimal and space for thousands.
-  // Set minimumFractionDigits to 0 to avoid forcing trailing zeros (e.g., 3,8 instead of 3,80).
-  // Set maximumFractionDigits to a high number to preserve existing decimal precision.
+
+  // Convert to string and truncate to 2 decimal places without rounding
+  let stringAmount = amount.toString();
+  const decimalIndex = stringAmount.indexOf('.');
+  if (decimalIndex !== -1 && stringAmount.length > decimalIndex + 3) {
+    // If there are more than 2 decimal places, truncate
+    stringAmount = stringAmount.substring(0, decimalIndex + 3);
+  } else if (decimalIndex === -1) {
+    // If no decimal, add .00
+    stringAmount += '.00';
+  } else if (stringAmount.length === decimalIndex + 2) {
+    // If one decimal, add another 0
+    stringAmount += '0';
+  }
+
+  // Convert back to number for Intl.NumberFormat to handle thousands separators
+  // and then manually replace the decimal point with a comma.
+  // We use minimumFractionDigits and maximumFractionDigits of 2 to ensure two decimal places.
   const formattedAmount = new Intl.NumberFormat('fr-FR', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 20, // Allows up to 20 decimal places if they exist, without forcing them.
-  }).format(amount);
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+    useGrouping: true // Ensures thousands separators are used
+  }).format(parseFloat(stringAmount)); // Use parseFloat to ensure it's treated as a number
+
   return formattedAmount;
 };
 
@@ -573,19 +590,19 @@ export default function ClientDetailPage() {
         </section>
 
         {/* Section for calculation summary */}
-        <section className="flex flex-row justify-around items-center gap-2 sm:gap-4 mt-10 mb-10 overflow-x-auto px-2">
+        <section className="flex flex-col sm:flex-row justify-around items-center gap-2 sm:gap-4 mt-10 mb-10 px-2">
           {/* Box 1: Prix Total */}
-          <div className="bg-[#f5f7f7] rounded-lg shadow-md p-2 sm:p-4 flex-1 text-center border border-gray-300 min-w-0 sm:min-w-[180px] md:min-w-[200px]">
+          <div className="bg-[#f5f7f7] rounded-lg shadow-md p-2 sm:p-4 flex-1 text-center border border-gray-300 w-full sm:min-w-[180px] md:min-w-[200px]">
             <h3 className="text-sm sm:text-lg font-semibold text-[#045757] whitespace-nowrap">Prix Total</h3>
             <p className="text-xl sm:text-2xl font-bold text-[#3DB9B2] mt-1 sm:mt-2 whitespace-nowrap">{formatCurrency(totalPrix)} DH</p>
           </div>
           {/* Box 2: Totalité de la Paie */}
-          <div className="bg-[#f5f7f7] rounded-lg shadow-md p-2 sm:p-4 flex-1 text-center border border-gray-300 min-w-0 sm:min-w-[180px] md:min-w-[200px]">
+          <div className="bg-[#f5f7f7] rounded-lg shadow-md p-2 sm:p-4 flex-1 text-center border border-gray-300 w-full sm:min-w-[180px] md:min-w-[200px]">
             <h3 className="text-sm sm:text-lg font-semibold text-[#045757] whitespace-nowrap">Totalité de la Paie</h3>
             <p className="text-xl sm:text-2xl font-bold text-[#3DB9B2] mt-1 sm:mt-2 whitespace-nowrap">{formatCurrency(totalPaiement)} DH</p>
           </div>
           {/* Box 3: Le Reste */}
-          <div className="bg-[#f5f7f7] rounded-lg shadow-md p-2 sm:p-4 flex-1 text-center border border-gray-300 min-w-0 sm:min-w-[180px] md:min-w-[200px]">
+          <div className="bg-[#f5f7f7] rounded-lg shadow-md p-2 sm:p-4 flex-1 text-center border border-gray-300 w-full sm:min-w-[180px] md:min-w-[200px]">
             <h3 className="text-sm sm:text-lg font-semibold text-[#045757] whitespace-nowrap">Le Reste</h3>
             <p className={`text-xl sm:text-2xl font-bold mt-1 sm:mt-2 whitespace-nowrap ${leReste < 0 ? 'text-red-500' : 'text-[#3DB9B2]'}`}>
               {formatCurrency(leReste)} DH
