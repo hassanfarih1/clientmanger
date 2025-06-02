@@ -590,7 +590,7 @@ export default function ClientDetailPage() {
         </section>
 
         {/* Section for calculation summary */}
-        <section className="flex flex-col sm:flex-row justify-around items-center gap-2 sm:gap-4 mt-10 mb-10 px-2">
+        <section className="flex flex-col md:flex-row justify-around items-center gap-2 sm:gap-4 mt-10 mb-10 px-2">
           {/* Box 1: Prix Total */}
           <div className="bg-[#f5f7f7] rounded-lg shadow-md p-2 sm:p-4 flex-1 text-center border border-gray-300 w-full sm:min-w-[180px] md:min-w-[200px]">
             <h3 className="text-sm sm:text-lg font-semibold text-[#045757] whitespace-nowrap">Prix Total</h3>
