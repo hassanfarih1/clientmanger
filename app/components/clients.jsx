@@ -8,28 +8,34 @@ export default function Clients() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [clients, setClients] = useState([]);
-  const [filteredClients, setFilteredClients] = useState([]); // New state for filtered clients
+  const [filteredClients, setFilteredClients] = useState([]);
   const [selectedClientId, setSelectedClientId] = useState(null);
   const [fullName, setFullName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [address, setAddress] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [searchTerm, setSearchTerm] = useState(''); // New state for search term
+  const [searchTerm, setSearchTerm] = useState('');
+  const [userType, setUserType] = useState(null); // New state for user type
 
   const router = useRouter();
+
+  useEffect(() => {
+    // Retrieve user type from localStorage on component mount
+    if (typeof window !== 'undefined') {
+      const storedUserType = localStorage.getItem('user_type');
+      setUserType(storedUserType);
+    }
+    fetchClients();
+  }, []);
 
   const fetchClients = async () => {
     const { data, error } = await supabase.from('clients').select('*');
     if (!error) {
       setClients(data);
-      setFilteredClients(data); // Initialize filtered clients with all clients
+      setFilteredClients(data);
     }
   };
-
-  useEffect(() => {
-    fetchClients();
-  }, []);
 
   // Effect to filter clients based on search term
   useEffect(() => {
@@ -40,10 +46,17 @@ export default function Clients() {
       client.address.toLowerCase().includes(lowercasedSearchTerm)
     );
     setFilteredClients(newFilteredClients);
-  }, [searchTerm, clients]); // Re-run when searchTerm or clients change
+  }, [searchTerm, clients]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // Prevent adding if not admin
+    if (userType !== 'admin') {
+      alert('You do not have permission to add clients.');
+      return;
+    }
+
     setLoading(true);
     setSuccess(false);
 
@@ -60,7 +73,7 @@ export default function Clients() {
       alert('Failed to add client: ' + error.message);
     } else {
       setSuccess(true);
-      fetchClients(); // Re-fetch clients to update the list
+      fetchClients();
       setTimeout(() => {
         handleClose();
       }, 1500);
@@ -68,6 +81,12 @@ export default function Clients() {
   };
 
   const handleDelete = async () => {
+    // Prevent deleting if not admin
+    if (userType !== 'admin') {
+      alert('You do not have permission to delete clients.');
+      return;
+    }
+
     if (!selectedClientId) return;
 
     setLoading(true);
@@ -105,7 +124,7 @@ export default function Clients() {
     if (clientError) {
       alert('Failed to delete client: ' + clientError.message);
     } else {
-      fetchClients(); // Re-fetch clients to update the list
+      fetchClients();
       setIsDeleteModalOpen(false);
       setSelectedClientId(null);
     }
@@ -130,17 +149,19 @@ export default function Clients() {
             <input
               type="text"
               placeholder="Search clients"
-              value={searchTerm} // Bind value to searchTerm state
-              onChange={(e) => setSearchTerm(e.target.value)} // Update searchTerm on change
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-9 pr-3 py-2 rounded-md bg-[#E0F7F7] text-sm text-gray-700 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#6DDADC]"
             />
           </div>
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="bg-[#3DB9B2] text-white text-sm px-5 py-2 rounded-md hover:bg-[#36a49d] transition-colors w-full sm:w-auto"
-          >
-            Ajouter un client
-          </button>
+          {userType === 'admin' && ( // Conditionally render the "Ajouter un client" button
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="bg-[#3DB9B2] text-white text-sm px-5 py-2 rounded-md hover:bg-[#36a49d] transition-colors w-full sm:w-auto"
+            >
+              Ajouter un client
+            </button>
+          )}
         </div>
 
         {/* Client list */}
@@ -158,15 +179,17 @@ export default function Clients() {
                 >
                   <Eye className="w-6 h-6" />
                 </button>
-                <button
-                  className="text-red-500 hover:text-red-700"
-                  onClick={() => {
-                    setSelectedClientId(client.id);
-                    setIsDeleteModalOpen(true);
-                  }}
-                >
-                  <Trash2 className="w-5 h-5" />
-                </button>
+                {userType === 'admin' && ( // Conditionally render the delete button
+                  <button
+                    className="text-red-500 hover:text-red-700"
+                    onClick={() => {
+                      setSelectedClientId(client.id);
+                      setIsDeleteModalOpen(true);
+                    }}
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
+                )}
               </div>
             </div>
           ))}

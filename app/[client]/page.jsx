@@ -1,7 +1,8 @@
+// pages/[client]/page.jsx
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import Navbar from '../components/navbar';
 import { Pen, Trash2, Plus } from 'lucide-react';
@@ -50,12 +51,19 @@ const formatDisplayDate = (dateString, isUnknown = false) => {
 
 export default function ClientDetailPage() {
   const { client } = useParams();
+  const router = useRouter(); // Initialize useRouter
   const [clientData, setClientData] = useState(null);
   const [isClientEditOpen, setIsClientEditOpen] = useState(false);
   const [fullName, setFullName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [address, setAddress] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // AUTHENTICATION STATES
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authLoading, setAuthLoading] = useState(true); // Separate loading for auth check
+  const [displayName, setDisplayName] = useState(''); // State to hold the user's display name
+  const [userRole, setUserRole] = useState(''); // State to hold the user's role
 
   // State for Add Payment Modal
   const [isAddPaymentOpen, setIsAddPaymentOpen] = useState(false);
@@ -125,51 +133,83 @@ export default function ClientDetailPage() {
   // Ref for the content to be printed (now used by html2canvas)
   const reportContentRef = useRef(null);
 
+  // Authentication Check useEffect
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const storedUsername = localStorage.getItem('user_username');
+      const storedName = localStorage.getItem('user_name');
+      const storedRole = localStorage.getItem('user_type'); // Get the user's role
+
+      if (storedUsername && storedName && storedRole) {
+        setIsAuthenticated(true);
+        setDisplayName(storedName);
+        setUserRole(storedRole); // Set the user's role
+      } else {
+        router.push('/login'); // Redirect if not authenticated
+      }
+      setAuthLoading(false); // Authentication check is complete
+    }
+  }, [router]);
+
+  // handleLogout function
+  const handleLogout = () => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('user_username');
+      localStorage.removeItem('user_name');
+      localStorage.removeItem('user_type'); // Clear the user's role from localStorage
+      setIsAuthenticated(false);
+      router.push('/login'); // Redirect to login page
+    }
+  };
 
   useEffect(() => {
     const fetchClientAndRelatedData = async () => {
-      setLoading(true);
-      const { data: clientDetails, error: clientError } = await supabase
-        .from('clients')
-        .select('*')
-        .eq('id', client)
-        .single();
+      // Only set loading for client data if auth check is done and successful
+      if (!authLoading && isAuthenticated) {
+        setLoading(true);
+        const { data: clientDetails, error: clientError } = await supabase
+          .from('clients')
+          .select('*')
+          .eq('id', client)
+          .single();
 
-      if (!clientError) {
-        setClientData(clientDetails);
-      } else {
-        console.error('Erreur lors de la récupération du client :', clientError.message);
+        if (!clientError) {
+          setClientData(clientDetails);
+        } else {
+          console.error('Erreur lors de la récupération du client :', clientError.message);
+        }
+
+        const { data: clientPayments, error: paymentsError } = await supabase
+          .from('paiements')
+          .select('*')
+          .eq('client_id', client)
+          .order('date_paiement', { ascending: false });
+
+        if (!paymentsError) {
+          setPayments(clientPayments);
+        } else {
+          console.error('Erreur lors de la récupération des paiements :', paymentsError.message);
+        }
+
+        const { data: clientPurchases, error: purchasesError } = await supabase
+          .from('achats')
+          .select('*')
+          .eq('client_id', client)
+          .order('date_achat', { ascending: false });
+
+        if (!purchasesError) {
+          setPurchases(clientPurchases);
+        } else {
+          console.error('Erreur lors de la récupération des achats :', purchasesError.message);
+        }
+
+        setLoading(false);
       }
-
-      const { data: clientPayments, error: paymentsError } = await supabase
-        .from('paiements')
-        .select('*')
-        .eq('client_id', client)
-        .order('date_paiement', { ascending: false });
-
-      if (!paymentsError) {
-        setPayments(clientPayments);
-      } else {
-        console.error('Erreur lors de la récupération des paiements :', paymentsError.message);
-      }
-
-      const { data: clientPurchases, error: purchasesError } = await supabase
-        .from('achats')
-        .select('*')
-        .eq('client_id', client)
-        .order('date_achat', { ascending: false });
-
-      if (!purchasesError) {
-        setPurchases(clientPurchases);
-      } else {
-        console.error('Erreur lors de la récupération des achats :', purchasesError.message);
-      }
-
-      setLoading(false);
     };
 
-    if (client) fetchClientAndRelatedData();
-  }, [client]);
+    // Fetch client data only if client param exists and auth check is done
+    if (client && !authLoading) fetchClientAndRelatedData();
+  }, [client, authLoading, isAuthenticated]);
 
   // useEffect to fetch types and classes
   useEffect(() => {
@@ -205,12 +245,9 @@ export default function ClientDetailPage() {
     const unitPrice = parseFloat(purchaseUnitPrice);
     const weight = parseFloat(purchaseWeight);
     if (!isNaN(unitPrice) && !isNaN(weight)) {
-      setPurchasePrice((unitPrice * weight)); // Removed .toFixed(2) to match new formatCurrency
+      setPurchasePrice((unitPrice * weight));
     } else {
-      // Keep existing price if user has manually entered it, otherwise clear if inputs are invalid
-      // This is a basic way to "prioritize" manual input.
-      // A more robust solution would involve a separate state for "isManualPrice"
-      if (purchasePrice === '') { // Only auto-clear if it's currently empty (not manually set)
+      if (purchasePrice === '') {
         setPurchasePrice('');
       }
     }
@@ -221,10 +258,9 @@ export default function ClientDetailPage() {
     const unitPrice = parseFloat(editPurchaseUnitPrice);
     const weight = parseFloat(editPurchaseWeight);
     if (!isNaN(unitPrice) && !isNaN(weight)) {
-      setEditPurchasePrice((unitPrice * weight)); // Removed .toFixed(2)
+      setEditPurchasePrice((unitPrice * weight));
     } else {
-      // Keep existing price if user has manually entered it, otherwise clear if inputs are invalid
-      if (editPurchasePrice === '') { // Only auto-clear if it's currently empty (not manually set)
+      if (editPurchasePrice === '') {
         setEditPurchasePrice('');
       }
     }
@@ -233,6 +269,10 @@ export default function ClientDetailPage() {
 
   // Client Edit
   const openClientEditModal = () => {
+    if (userRole !== 'admin') {
+      alert("Vous n'êtes pas autorisé à modifier les informations du client.");
+      return;
+    }
     setFullName(clientData.full_name || '');
     setPhoneNumber(clientData.phone_number || '');
     setAddress(clientData.address || '');
@@ -241,6 +281,10 @@ export default function ClientDetailPage() {
 
   const handleClientUpdate = async (e) => {
     e.preventDefault();
+    if (userRole !== 'admin') {
+      alert("Vous n'êtes pas autorisé à modifier les informations du client.");
+      return;
+    }
     setLoading(true);
 
     const { error } = await supabase
@@ -264,6 +308,10 @@ export default function ClientDetailPage() {
   // Add Payment
   const handleAddPayment = async (e) => {
     e.preventDefault();
+    if (userRole !== 'admin') {
+      alert("Vous n'êtes pas autorisé à ajouter des paiements.");
+      return;
+    }
     setPaymentLoading(true);
 
     const { data, error } = await supabase
@@ -273,7 +321,7 @@ export default function ClientDetailPage() {
           client_id: client,
           date_paiement: isPaymentDateUnknown ? null : paymentDate,
           type_paiement: paymentType,
-          paiement: parseFloat(paymentAmount), // Ensure it's a number
+          paiement: parseFloat(paymentAmount),
         },
       ])
       .select();
@@ -293,6 +341,10 @@ export default function ClientDetailPage() {
 
   // Edit Payment
   const openEditPaymentModal = (payment) => {
+    if (userRole !== 'admin') {
+      alert("Vous n'êtes pas autorisé à modifier les paiements.");
+      return;
+    }
     setCurrentPayment(payment);
     setEditPaymentDate(payment.date_paiement || '');
     setEditIsPaymentDateUnknown(payment.date_paiement === null);
@@ -303,6 +355,10 @@ export default function ClientDetailPage() {
 
   const handleUpdatePayment = async (e) => {
     e.preventDefault();
+    if (userRole !== 'admin') {
+      alert("Vous n'êtes pas autorisé à modifier les paiements.");
+      return;
+    }
     setEditPaymentLoading(true);
 
     const { data, error } = await supabase
@@ -310,7 +366,7 @@ export default function ClientDetailPage() {
       .update({
         date_paiement: editIsPaymentDateUnknown ? null : editPaymentDate,
         type_paiement: editPaymentType,
-        paiement: parseFloat(editPaymentAmount), // Ensure it's a number
+        paiement: parseFloat(editPaymentAmount),
       })
       .eq('id', currentPayment.id)
       .select();
@@ -328,11 +384,19 @@ export default function ClientDetailPage() {
 
   // Delete Payment
   const openConfirmDeletePaymentModal = (id) => {
+    if (userRole !== 'admin') {
+      alert("Vous n'êtes pas autorisé à supprimer des paiements.");
+      return;
+    }
     setPaymentToDeleteId(id);
     setIsConfirmDeletePaymentOpen(true);
   };
 
   const handleDeletePaymentConfirmed = async () => {
+    if (userRole !== 'admin') {
+      alert("Vous n'êtes pas autorisé à supprimer des paiements.");
+      return;
+    }
     setPaymentLoading(true);
     const { error } = await supabase
       .from('paiements')
@@ -352,6 +416,10 @@ export default function ClientDetailPage() {
   // Add Purchase
   const handleAddPurchase = async (e) => {
     e.preventDefault();
+    if (userRole !== 'admin') {
+      alert("Vous n'êtes pas autorisé à ajouter des achats.");
+      return;
+    }
     setPurchaseLoading(true);
 
     const { data, error } = await supabase
@@ -389,6 +457,10 @@ export default function ClientDetailPage() {
 
   // Edit Purchase
   const openEditPurchaseModal = (purchase) => {
+    if (userRole !== 'admin') {
+      alert("Vous n'êtes pas autorisé à modifier les achats.");
+      return;
+    }
     setCurrentPurchase(purchase);
     setEditPurchaseDate(purchase.date_achat || '');
     setEditIsPurchaseDateUnknown(purchase.date_achat === null);
@@ -403,6 +475,10 @@ export default function ClientDetailPage() {
 
   const handleUpdatePurchase = async (e) => {
     e.preventDefault();
+    if (userRole !== 'admin') {
+      alert("Vous n'êtes pas autorisé à modifier les achats.");
+      return;
+    }
     setEditPurchaseLoading(true);
 
     const { data, error } = await supabase
@@ -432,11 +508,19 @@ export default function ClientDetailPage() {
 
   // Delete Purchase
   const openConfirmDeletePurchaseModal = (id) => {
+    if (userRole !== 'admin') {
+      alert("Vous n'êtes pas autorisé à supprimer des achats.");
+      return;
+    }
     setPurchaseToDeleteId(id);
     setIsConfirmDeletePurchaseOpen(true);
   };
 
   const handleDeletePurchaseConfirmed = async () => {
+    if (userRole !== 'admin') {
+      alert("Vous n'êtes pas autorisé à supprimer des achats.");
+      return;
+    }
     setPurchaseLoading(true);
     const { error } = await supabase
       .from('achats')
@@ -456,6 +540,10 @@ export default function ClientDetailPage() {
   // Handle Add New Type
   const handleAddNewType = async (e) => {
     e.preventDefault();
+    if (userRole !== 'admin') {
+      alert("Vous n'êtes pas autorisé à ajouter des types.");
+      return;
+    }
     setIsAddingType(true);
     const typeNameToInsert = newTypeName.toLowerCase();
     const { data, error } = await supabase
@@ -478,6 +566,10 @@ export default function ClientDetailPage() {
   // Handle Add New Classe
   const handleAddNewClasse = async (e) => {
     e.preventDefault();
+    if (userRole !== 'admin') {
+      alert("Vous n'êtes pas autorisé à ajouter des classes.");
+      return;
+    }
     setIsAddingClasse(true);
     const classeNameToInsert = newClasseName.toLowerCase();
     const { data, error } = await supabase
@@ -507,15 +599,15 @@ export default function ClientDetailPage() {
 
     // Generate canvas from the report content
     const canvas = await html2canvas(input, {
-      scale: 2, // Increase scale for better resolution
-      useCORS: true, // Needed if you have images from external sources
-      logging: true, // Enable logging for debugging
+      scale: 2,
+      useCORS: true,
+      logging: true,
     });
 
     const imgData = canvas.toDataURL('image/png');
-    const pdf = new jsPDF('p', 'mm', 'a4'); // 'p' for portrait, 'mm' for millimeters, 'a4' for A4 size
-    const imgWidth = 210; // A4 width in mm
-    const pageHeight = 297; // A4 height in mm
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const imgWidth = 210;
+    const pageHeight = 297;
     const imgHeight = canvas.height * imgWidth / canvas.width;
     let heightLeft = imgHeight;
     let position = 0;
@@ -535,8 +627,12 @@ export default function ClientDetailPage() {
     pdf.save(`${clientData.full_name.replace(/\s+/g, '_')}_rapport.pdf`);
   };
 
-
-  if (loading || !clientData) {
+  // Combine loading states for the main loading screen
+  if (authLoading || loading || !clientData) {
+    // If not authenticated and auth check is done, show nothing as redirect will happen
+    if (!isAuthenticated && !authLoading) {
+      return null;
+    }
     return (
       <div className="flex items-center justify-center min-h-screen bg-softgray">
         <div className="flex flex-col items-center">
@@ -554,20 +650,23 @@ export default function ClientDetailPage() {
 
   return (
     <div>
-      <Navbar />
+      {/* Pass the user's name and logout function to Navbar */}
+      <Navbar userNameForDisplay={displayName} onLogout={handleLogout} />
       <main className="mx-10 mt-10 px-6 py-5 bg-[#d9f1f1] rounded-lg">
         <div className="flex flex-col sm:flex-row items-center sm:justify-between gap-3 border-b border-gray-300 pb-3 mb-6">
           <div className="flex items-center gap-3">
             <h1 className="text-4xl font-bold text-[#045757] tracking-wide max-w-full">
               {clientData.full_name}
             </h1>
-            <button
-              onClick={openClientEditModal}
-              aria-label="Modifier le client"
-              className="text-[#3DB9B2] hover:text-[#298b89] transition"
-            >
-              <Pen size={24} />
-            </button>
+            {userRole === 'admin' && ( // Conditionally render edit button
+              <button
+                onClick={openClientEditModal}
+                aria-label="Modifier le client"
+                className="text-[#3DB9B2] hover:text-[#298b89] transition"
+              >
+                <Pen size={24} />
+              </button>
+            )}
           </div>
           {/* Imprimer le rapport button */}
           <button
@@ -615,39 +714,47 @@ export default function ClientDetailPage() {
           <div className="flex-1 overflow-x-auto bg-white rounded-lg shadow p-4">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-semibold text-[#045757]">Paiements</h2>
-              <button
-                onClick={() => setIsAddPaymentOpen(true)}
-                className="bg-[#3DB9B2] text-white text-sm px-4 py-2 rounded-md hover:bg-[#36a49d] transition-colors"
-              >
-                Ajouter un paiement
-              </button>
+              {userRole === 'admin' && ( // Conditionally render add payment button
+                <button
+                  onClick={() => setIsAddPaymentOpen(true)}
+                  className="bg-[#3DB9B2] text-white text-sm px-4 py-2 rounded-md hover:bg-[#36a49d] transition-colors"
+                >
+                  Ajouter un paiement
+                </button>
+              )}
             </div>
             <table className="w-full border-collapse text-xs sm:text-sm md:text-base">
               <thead>
                 <tr className="bg-[#3DB9B2] text-white text-xs sm:text-sm">
-                  <th className="border px-2 py-1 text-left">Date de paiement</th><th className="border px-2 py-1 text-left">Type de paiement</th><th className="border px-2 py-1 text-left">Paiement</th><th className="border px-2 py-1 text-left">Actions</th>
+                  <th className="border px-2 py-1 text-left">Date de paiement</th>
+                  <th className="border px-2 py-1 text-left">Type de paiement</th>
+                  <th className="border px-2 py-1 text-left">Paiement</th>
+                  {userRole === 'admin' && ( // Conditionally render actions header
+                    <th className="border px-2 py-1 text-left">Actions</th>
+                  )}
                 </tr>
               </thead>
-              <tbody>{
-                payments.length === 0 ? (
+              <tbody>
+                {payments.length === 0 ? (
                   <tr>
-                    <td colSpan="4" className="border px-2 py-4 text-center text-gray-500">Aucun paiement trouvé.</td>
+                    <td colSpan={userRole === 'admin' ? "4" : "3"} className="border px-2 py-4 text-center text-gray-500">Aucun paiement trouvé.</td>
                   </tr>
                 ) : (
                   payments.map((row, idx) => (
                     <tr key={row.id} className={idx % 2 === 0 ? 'bg-gray-100' : ''}>
-                      {/* Added whitespace-nowrap */}
                       <td className="border px-2 py-1 whitespace-nowrap">{formatDisplayDate(row.date_paiement, row.date_paiement === null)}</td>
                       <td className="border px-2 py-1">{row.type_paiement}</td>
                       <td className="border px-2 py-1">{formatCurrency(row.paiement)}</td>
-                      <td className="border px-2 py-1 flex gap-2">
-                        <button onClick={() => openEditPaymentModal(row)} aria-label={`Modifier le paiement ${row.id}`} className="text-[#3DB9B2] hover:text-[#298b89] transition"><Pen size={16} /></button>
-                        <button onClick={() => openConfirmDeletePaymentModal(row.id)} aria-label={`Supprimer le paiement ${row.id}`} className="text-red-500 pl-2 hover:text-red-700 transition"><Trash2 size={16} /></button>
-                      </td>
+                      {userRole === 'admin' && ( // Conditionally render action buttons
+                        <td className="border px-2 py-1 flex gap-2">
+                          <button onClick={() => openEditPaymentModal(row)} aria-label={`Modifier le paiement ${row.id}`} className="text-[#3DB9B2] hover:text-[#298b89] transition"><Pen size={16} /></button>
+                          <button onClick={() => openConfirmDeletePaymentModal(row.id)} aria-label={`Supprimer le paiement ${row.id}`} className="text-red-500 pl-2 hover:text-red-700 transition"><Trash2 size={16} /></button>
+                        </td>
+                      )}
                     </tr>
                   ))
-                )
-              }</tbody>
+                )}
+              </tbody>
             </table>
           </div>
 
@@ -655,12 +762,14 @@ export default function ClientDetailPage() {
           <div className="flex-1 overflow-x-auto bg-white rounded-lg shadow p-4">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-semibold text-[#045757]">Achats</h2>
-              <button
-                onClick={() => setIsAddPurchaseOpen(true)}
-                className="bg-[#3DB9B2] text-white text-sm px-4 py-2 rounded-md hover:bg-[#36a49d] transition-colors"
-              >
-                Ajouter un achat
-              </button>
+              {userRole === 'admin' && ( // Conditionally render add purchase button
+                <button
+                  onClick={() => setIsAddPurchaseOpen(true)}
+                  className="bg-[#3DB9B2] text-white text-sm px-4 py-2 rounded-md hover:bg-[#36a49d] transition-colors"
+                >
+                  Ajouter un achat
+                </button>
+              )}
             </div>
             <table className="w-full border-collapse text-xs sm:text-sm md:text-base">
               <thead>
@@ -681,18 +790,19 @@ export default function ClientDetailPage() {
                     <span className="inline sm:hidden">P.Unit.</span>
                   </th>
                   <th className="border px-2 py-1 text-left">Prix</th>
-                  <th className="border px-2 py-1 text-left">Actions</th>
+                  {userRole === 'admin' && ( // Conditionally render actions header
+                    <th className="border px-2 py-1 text-left">Actions</th>
+                  )}
                 </tr>
               </thead>
-              <tbody>{
-                purchases.length === 0 ? (
+              <tbody>
+                {purchases.length === 0 ? (
                   <tr>
-                    <td colSpan="8" className="border px-2 py-4 text-center text-gray-500">Aucun achat trouvé.</td>
+                    <td colSpan={userRole === 'admin' ? "8" : "7"} className="border px-2 py-4 text-center text-gray-500">Aucun achat trouvé.</td>
                   </tr>
                 ) : (
                   purchases.map((row, idx) => (
                     <tr key={row.id} className={idx % 2 === 0 ? 'bg-gray-100' : ''}>
-                      {/* Added whitespace-nowrap */}
                       <td className="border px-2 py-1 whitespace-nowrap">{formatDisplayDate(row.date_achat, row.date_achat === null)}</td>
                       <td className="border px-2 py-1">{row.quantite}</td>
                       <td className="border px-2 py-1">{row.type?.toLowerCase()}</td>
@@ -700,20 +810,22 @@ export default function ClientDetailPage() {
                       <td className="border px-2 py-1">{row.poids}</td>
                       <td className="border px-2 py-1">{formatCurrency(row.prix_unitaire)}</td>
                       <td className="border px-2 py-1">{formatCurrency(row.prix_total)}</td>
-                      <td className="border px-2 py-1 flex gap-2">
-                        <button onClick={() => openEditPurchaseModal(row)} aria-label={`Modifier l'achat ${row.id}`} className="text-[#3DB9B2] hover:text-[#298b89] transition"><Pen size={16} /></button>
-                        <button onClick={() => openConfirmDeletePurchaseModal(row.id)} aria-label={`Supprimer l'achat ${row.id}`} className="text-red-500 pl-2 hover:text-red-700 transition"><Trash2 size={16} /></button>
-                      </td>
+                      {userRole === 'admin' && ( // Conditionally render action buttons
+                        <td className="border px-2 py-1 flex gap-2">
+                          <button onClick={() => openEditPurchaseModal(row)} aria-label={`Modifier l'achat ${row.id}`} className="text-[#3DB9B2] hover:text-[#298b89] transition"><Pen size={16} /></button>
+                          <button onClick={() => openConfirmDeletePurchaseModal(row.id)} aria-label={`Supprimer l'achat ${row.id}`} className="text-red-500 pl-2 hover:text-red-700 transition"><Trash2 size={16} /></button>
+                        </td>
+                      )}
                     </tr>
                   ))
-                )
-              }</tbody>
+                )}
+              </tbody>
             </table>
           </div>
         </section>
 
         {/* Client Edit Modal */}
-        {isClientEditOpen && (
+        {isClientEditOpen && userRole === 'admin' && (
           <div
             className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
             onClick={() => setIsClientEditOpen(false)}
@@ -775,7 +887,7 @@ export default function ClientDetailPage() {
         )}
 
         {/* Add Payment Modal */}
-        {isAddPaymentOpen && (
+        {isAddPaymentOpen && userRole === 'admin' && (
           <div
             className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
             onClick={() => setIsAddPaymentOpen(false)}
@@ -835,10 +947,10 @@ export default function ClientDetailPage() {
               <label className="block mb-4 text-sm font-medium text-gray-700">
                 Paiement
                 <input
-                  type="text" // Changed to text to allow comma input
+                  type="text"
                   value={paymentAmount}
                   onChange={(e) => {
-                    const value = e.target.value.replace(',', '.'); // Replace comma with dot
+                    const value = e.target.value.replace(',', '.');
                     setPaymentAmount(value);
                   }}
                   required
@@ -866,7 +978,7 @@ export default function ClientDetailPage() {
         )}
 
         {/* Edit Payment Modal */}
-        {isEditPaymentOpen && currentPayment && (
+        {isEditPaymentOpen && currentPayment && userRole === 'admin' && (
           <div
             className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
             onClick={() => setIsEditPaymentOpen(false)}
@@ -926,10 +1038,10 @@ export default function ClientDetailPage() {
               <label className="block mb-4 text-sm font-medium text-gray-700">
                 Paiement
                 <input
-                  type="text" // Changed to text to allow comma input
+                  type="text"
                   value={editPaymentAmount}
                   onChange={(e) => {
-                    const value = e.target.value.replace(',', '.'); // Replace comma with dot
+                    const value = e.target.value.replace(',', '.');
                     setEditPaymentAmount(value);
                   }}
                   required
@@ -957,7 +1069,7 @@ export default function ClientDetailPage() {
         )}
 
         {/* Delete Payment Confirmation Modal */}
-        {isConfirmDeletePaymentOpen && (
+        {isConfirmDeletePaymentOpen && userRole === 'admin' && (
           <div
             className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
             onClick={() => setIsConfirmDeletePaymentOpen(false)}
@@ -990,7 +1102,7 @@ export default function ClientDetailPage() {
         )}
 
         {/* Add Purchase Modal */}
-        {isAddPurchaseOpen && (
+        {isAddPurchaseOpen && userRole === 'admin' && (
           <div
             className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
             onClick={() => setIsAddPurchaseOpen(false)}
@@ -1033,7 +1145,7 @@ export default function ClientDetailPage() {
               <label className="block mb-2 text-sm font-medium text-gray-700">
                 Quantité
                 <input
-                  type="text" // Changed to text to allow comma input
+                  type="text"
                   value={purchaseQuantity}
                   onChange={(e) => {
                     const value = e.target.value.replace(',', '.');
@@ -1102,7 +1214,7 @@ export default function ClientDetailPage() {
               <label className="block mb-2 text-sm font-medium text-gray-700">
                 Poids
                 <input
-                  type="text" // Changed to text to allow comma input
+                  type="text"
                   step="0.01"
                   value={purchaseWeight}
                   onChange={(e) => {
@@ -1113,11 +1225,11 @@ export default function ClientDetailPage() {
                   className="w-full mt-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#3DB9B2]"
                 />
               </label>
-              {/* NEW: Prix unitaire field */}
+              {/* Prix unitaire field */}
               <label className="block mb-2 text-sm font-medium text-gray-700">
                 Prix unitaire
                 <input
-                  type="text" // Changed to text to allow comma input
+                  type="text"
                   step="0.01"
                   value={purchaseUnitPrice}
                   onChange={(e) => {
@@ -1128,11 +1240,11 @@ export default function ClientDetailPage() {
                   className="w-full mt-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#3DB9B2]"
                 />
               </label>
-              {/* MODIFIED: Prix field (formerly Prix total) - now editable */}
+              {/* Prix field (formerly Prix total) - now editable */}
               <label className="block mb-4 text-sm font-medium text-gray-700">
                 Prix
                 <input
-                  type="text" // Changed to text to allow comma input
+                  type="text"
                   step="0.01"
                   value={purchasePrice}
                   onChange={(e) => {
@@ -1164,7 +1276,7 @@ export default function ClientDetailPage() {
         )}
 
         {/* Edit Purchase Modal */}
-        {isEditPurchaseOpen && currentPurchase && (
+        {isEditPurchaseOpen && currentPurchase && userRole === 'admin' && (
           <div
             className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
             onClick={() => setIsEditPurchaseOpen(false)}
@@ -1207,7 +1319,7 @@ export default function ClientDetailPage() {
               <label className="block mb-2 text-sm font-medium text-gray-700">
                 Quantité
                 <input
-                  type="text" // Changed to text to allow comma input
+                  type="text"
                   value={editPurchaseQuantity}
                   onChange={(e) => {
                     const value = e.target.value.replace(',', '.');
@@ -1276,7 +1388,7 @@ export default function ClientDetailPage() {
               <label className="block mb-2 text-sm font-medium text-gray-700">
                 Poids
                 <input
-                  type="text" // Changed to text to allow comma input
+                  type="text"
                   step="0.01"
                   value={editPurchaseWeight}
                   onChange={(e) => {
@@ -1287,11 +1399,11 @@ export default function ClientDetailPage() {
                   className="w-full mt-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#3DB9B2]"
                 />
               </label>
-              {/* NEW: Prix unitaire field for Edit */}
+              {/* Prix unitaire field for Edit */}
               <label className="block mb-2 text-sm font-medium text-gray-700">
                 Prix unitaire
                 <input
-                  type="text" // Changed to text to allow comma input
+                  type="text"
                   step="0.01"
                   value={editPurchaseUnitPrice}
                   onChange={(e) => {
@@ -1302,11 +1414,11 @@ export default function ClientDetailPage() {
                   className="w-full mt-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#3DB9B2]"
                 />
               </label>
-              {/* MODIFIED: Prix field (formerly Prix total) - now editable for Edit */}
+              {/* Prix field (formerly Prix total) - now editable for Edit */}
               <label className="block mb-4 text-sm font-medium text-gray-700">
                 Prix
                 <input
-                  type="text" // Changed to text to allow comma input
+                  type="text"
                   step="0.01"
                   value={editPurchasePrice}
                   onChange={(e) => {
@@ -1338,7 +1450,7 @@ export default function ClientDetailPage() {
         )}
 
         {/* Delete Purchase Confirmation Modal */}
-        {isConfirmDeletePurchaseOpen && (
+        {isConfirmDeletePurchaseOpen && userRole === 'admin' && (
           <div
             className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
             onClick={() => setIsConfirmDeletePurchaseOpen(false)}
@@ -1370,8 +1482,8 @@ export default function ClientDetailPage() {
           </div>
         )}
 
-        {/* NEW: Add Type Modal */}
-        {isAddTypeModalOpen && (
+        {/* Add Type Modal */}
+        {isAddTypeModalOpen && userRole === 'admin' && (
           <div
             className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
             onClick={() => setIsAddTypeModalOpen(false)}
@@ -1412,8 +1524,8 @@ export default function ClientDetailPage() {
           </div>
         )}
 
-        {/* NEW: Add Classe Modal */}
-        {isAddClasseModalOpen && (
+        {/* Add Classe Modal */}
+        {isAddClasseModalOpen && userRole === 'admin' && (
           <div
             className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
             onClick={() => setIsAddClasseModalOpen(false)}
