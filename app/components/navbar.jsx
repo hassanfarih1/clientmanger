@@ -5,7 +5,6 @@ import Image from 'next/image';
 import Link from 'next/link';
 import React, { useState } from 'react';
 
-// **CRITICAL CHANGE:** Accept `userNameForDisplay` instead of `username`
 export default function Navbar({ userNameForDisplay, onLogout }) {
   const [showDropdown, setShowDropdown] = useState(false);
 
@@ -15,7 +14,15 @@ export default function Navbar({ userNameForDisplay, onLogout }) {
         {/* Logo + Title */}
         <div className="flex items-center space-x-8">
           <Link href="/" className="flex items-center space-x-4">
-            <Image src="/client_manager.png" width={56} height={56} alt="Client Manager Icon" />
+            {/* Logo Image */}
+            <Image
+              src="/client_manager.png"
+              width={56} // Base width, overridden by responsive classes
+              height={56} // Base height, overridden by responsive classes
+              alt="Client Manager Icon"
+              // Responsive sizing: w-8 h-8 (32px) on small screens, md:w-14 md:h-14 (56px) on medium and larger
+              className="w-8 h-8 md:w-14 md:h-14"
+            />
             <h1 className="text-3xl font-bold text-[#E0F7F7]">Client Manager</h1>
           </Link>
         </div>
@@ -28,7 +35,7 @@ export default function Navbar({ userNameForDisplay, onLogout }) {
             aria-haspopup="true"
             aria-expanded={showDropdown ? "true" : "false"}
           >
-            {/* **CRITICAL CHANGE:** Display `userNameForDisplay` */}
+            {/* Display user's name */}
             <span className="text-lg font-medium">{userNameForDisplay}</span>
             <svg className={`w-4 h-4 transition-transform duration-200 ${showDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>

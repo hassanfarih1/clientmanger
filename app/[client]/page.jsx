@@ -692,17 +692,17 @@ export default function ClientDetailPage() {
         <section className="flex flex-col md:flex-row justify-around items-center gap-2 sm:gap-4 mt-10 mb-10 px-2">
           {/* Box 1: Prix Total */}
           <div className="bg-[#f5f7f7] rounded-lg shadow-md p-2 sm:p-4 flex-1 text-center border border-gray-300 w-full sm:min-w-[180px] md:min-w-[200px]">
-            <h3 className="text-sm sm:text-lg font-semibold text-[#045757] whitespace-nowrap">Prix Total</h3>
+            <h3 className="text-sm sm:text-lg font-semibold text-[#045757] whitespace-nowrap">chiffre daffaire</h3>
             <p className="text-xl sm:text-2xl font-bold text-[#3DB9B2] mt-1 sm:mt-2 whitespace-nowrap">{formatCurrency(totalPrix)} DH</p>
           </div>
           {/* Box 2: Totalité de la Paie */}
           <div className="bg-[#f5f7f7] rounded-lg shadow-md p-2 sm:p-4 flex-1 text-center border border-gray-300 w-full sm:min-w-[180px] md:min-w-[200px]">
-            <h3 className="text-sm sm:text-lg font-semibold text-[#045757] whitespace-nowrap">Totalité de la Paie</h3>
+            <h3 className="text-sm sm:text-lg font-semibold text-[#045757] whitespace-nowrap">les avances</h3>
             <p className="text-xl sm:text-2xl font-bold text-[#3DB9B2] mt-1 sm:mt-2 whitespace-nowrap">{formatCurrency(totalPaiement)} DH</p>
           </div>
           {/* Box 3: Le Reste */}
           <div className="bg-[#f5f7f7] rounded-lg shadow-md p-2 sm:p-4 flex-1 text-center border border-gray-300 w-full sm:min-w-[180px] md:min-w-[200px]">
-            <h3 className="text-sm sm:text-lg font-semibold text-[#045757] whitespace-nowrap">Le Reste</h3>
+            <h3 className="text-sm sm:text-lg font-semibold text-[#045757] whitespace-nowrap">le Reste</h3>
             <p className={`text-xl sm:text-2xl font-bold mt-1 sm:mt-2 whitespace-nowrap ${leReste < 0 ? 'text-red-500' : 'text-[#3DB9B2]'}`}>
               {formatCurrency(leReste)} DH
             </p>

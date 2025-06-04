@@ -80,17 +80,17 @@ export default function Hero() {
       <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Box 1: Prix Total (Total des Achats) */}
         <div className="bg-white rounded-lg shadow-lg py-8 px-6 flex flex-col items-center justify-center text-center border border-gray-200 hover:shadow-xl transition-shadow duration-300">
-          <h3 className="text-base font-semibold text-gray-700 mb-3">Prix Total</h3>
+          <h3 className="text-base font-semibold text-gray-700 mb-3">chiffre d'affaire</h3>
           <p className="text-3xl font-bold text-[#3DB9B2]">{formatCurrency(totalPrixAchats)} DH</p>
         </div>
         {/* Box 2: Totalité de la Paie (Total des Paiements) */}
         <div className="bg-white rounded-lg shadow-lg py-8 px-6 flex flex-col items-center justify-center text-center border border-gray-200 hover:shadow-xl transition-shadow duration-300">
-          <h3 className="text-base font-semibold text-gray-700 mb-3">Totalité de la Paie</h3>
+          <h3 className="text-base font-semibold text-gray-700 mb-3">les avances</h3>
           <p className="text-3xl font-bold text-[#3DB9B2]">{formatCurrency(totalPaiements)} DH</p>
         </div>
         {/* Box 3: Le Reste */}
         <div className="bg-white rounded-lg shadow-lg py-8 px-6 flex flex-col items-center justify-center text-center border border-gray-200 hover:shadow-xl transition-shadow duration-300">
-          <h3 className="text-base font-semibold text-gray-700 mb-3">Le Reste</h3>
+          <h3 className="text-base font-semibold text-gray-700 mb-3">Le reste</h3>
           <p className={`text-3xl font-bold ${leReste < 0 ? 'text-red-600' : 'text-[#3DB9B2]'}`}>
             {formatCurrency(leReste)} DH
           </p>
