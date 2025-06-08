@@ -183,7 +183,7 @@ export default function ClientDetailPage() {
           .from('paiements')
           .select('*')
           .eq('client_id', client)
-          .order('date_paiement', { ascending: false });
+          .order('date_paiement', { ascending: false, nullsFirst: false }); // MODIFIED HERE
 
         if (!paymentsError) {
           setPayments(clientPayments);
@@ -195,7 +195,7 @@ export default function ClientDetailPage() {
           .from('achats')
           .select('*')
           .eq('client_id', client)
-          .order('date_achat', { ascending: false });
+          .order('date_achat', { ascending: false, nullsFirst: false }); // MODIFIED HERE
 
         if (!purchasesError) {
           setPurchases(clientPurchases);
@@ -803,13 +803,13 @@ export default function ClientDetailPage() {
                 ) : (
                   purchases.map((row, idx) => (
                     <tr key={row.id} className={idx % 2 === 0 ? 'bg-gray-100' : ''}>
-                      <td className="border px-2 py-1 whitespace-nowrap">{formatDisplayDate(row.date_achat, row.date_achat === null)}</td>
-                      <td className="border px-2 py-1">{row.quantite}</td>
-                      <td className="border px-2 py-1">{row.type?.toLowerCase()}</td>
-                      <td className="border px-2 py-1">{row.classe?.toLowerCase()}</td>
-                      <td className="border px-2 py-1">{row.poids}</td>
-                      <td className="border px-2 py-1">{formatCurrency(row.prix_unitaire)}</td>
-                      <td className="border px-2 py-1">{formatCurrency(row.prix_total)}</td>
+                      <td style={{ border: '1px solid #ddd', padding: '8px' }}>{formatDisplayDate(row.date_achat, row.date_achat === null)}</td>
+                      <td style={{ border: '1px solid #ddd', padding: '8px' }}>{row.quantite}</td>
+                      <td style={{ border: '1px solid #ddd', padding: '8px' }}>{row.type?.toLowerCase()}</td>
+                      <td style={{ border: '1px solid #ddd', padding: '8px' }}>{row.classe?.toLowerCase()}</td>
+                      <td style={{ border: '1px solid #ddd', padding: '8px' }}>{row.poids}</td>
+                      <td style={{ border: '1px solid #ddd', padding: '8px' }}>{formatCurrency(row.prix_unitaire)}</td>
+                      <td style={{ border: '1px solid #ddd', padding: '8px' }}>{formatCurrency(row.prix_total)}</td>
                       {userRole === 'admin' && ( // Conditionally render action buttons
                         <td className="border px-2 py-1 flex gap-2">
                           <button onClick={() => openEditPurchaseModal(row)} aria-label={`Modifier l'achat ${row.id}`} className="text-[#3DB9B2] hover:text-[#298b89] transition"><Pen size={16} /></button>
